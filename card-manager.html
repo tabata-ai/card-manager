@@ -553,6 +553,23 @@ function compressImage(dataUrl) {
   });
 }
 
+// Compress for API call: resize to max 800px, JPEG 0.85
+function compressForApi(dataUrl) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 800;
+      const scale = Math.min(1, maxW / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.src = dataUrl;
+  });
+}
+
 function openImgModal(src) {
   document.getElementById('imgModalSrc').src = src;
   document.getElementById('imgModal').classList.add('open');
@@ -1376,18 +1393,22 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
   document.getElementById('photo-content').innerHTML = `<div class="scanning"><div class="scanning-spinner"></div><div style="font-size:14px;color:var(--text2)">Gemini AIが解析中...</div></div>`;
 
   try {
-    const base64 = await fileToBase64(file);
-    // Also store compressed image for display
+    // Read file as dataURL
     const dataUrl = await new Promise(res => {
       const reader = new FileReader();
       reader.onload = () => res(reader.result);
       reader.readAsDataURL(file);
     });
+    // Compress for display (320px)
     capturedImage = await compressImage(dataUrl);
+    // Compress for API (800px max, JPEG 0.85) — avoids "Load failed" on large iPhone photos
+    const apiDataUrl = await compressForApi(dataUrl);
+    const base64 = apiDataUrl.split(',')[1];
+    const mimeTypeForApi = 'image/jpeg';
 
     const result = mode === 'worker'
-      ? await analyzeViaWorker(base64, file.type)
-      : await analyzeWithGemini(base64, file.type, getApiKey());
+      ? await analyzeViaWorker(base64, mimeTypeForApi)
+      : await analyzeWithGemini(base64, mimeTypeForApi, getApiKey());
 
     if (result.cardName) document.getElementById('input-name').value = result.cardName;
     if (result.expiryDate) {
