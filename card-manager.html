@@ -1415,7 +1415,8 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
       <img src="${capturedImage}" style="width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px;">
       <div class="label" style="font-size:13px;color:var(--success)">✅ 読み取り完了 — 下のフォームを確認してください</div>`;
   } catch(err) {
-    showToast('読み取りに失敗しました。手動で入力してください。');
+    const msg = err?.message || String(err);
+    showToast('エラー: ' + msg.slice(0, 80));
     console.error(err);
     // Reset photo area on error
     document.getElementById('photo-content').innerHTML = `
