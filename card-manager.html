@@ -541,7 +541,8 @@ let cards = JSON.parse(localStorage.getItem('cc_cards') || '[]');
 let capturedImage = null;
 let frontBase64Api = null;
 let frontApiDataUrl = null;
-let scanStep = 'idle'; // 'idle' | 'front_done'
+let scanStep = 'idle'; // 'idle' | 'front_done' | 'back_done'
+let backApiDataUrl = null;
 // Mask state
 let maskRect = { xr: 0.04, yr: 0.50, wr: 0.92, hr: 0.16 };
 let isDraggingMask = false;
@@ -1399,16 +1400,21 @@ function resetPhotoArea() {
     <div class="sub">タップしてカメラを起動</div>`;
 }
 
-function showMaskUI(apiDataUrl) {
+function showMaskUI(apiDataUrl, isFront = true) {
   document.getElementById('photoArea').onclick = null;
   maskRect = { xr: 0.04, yr: 0.50, wr: 0.92, hr: 0.16 };
+  const label = isFront ? '表面' : '裏面';
+  const backBtn = isFront
+    ? `<button onclick="event.stopPropagation();applyMaskAndShootBack()" style="padding:8px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">↩️ 裏面も撮影</button>`
+    : '';
+  const analyzeOnClick = isFront ? 'applyFrontMaskAndAnalyze()' : 'applyBackMaskAndAnalyze()';
   document.getElementById('photo-content').innerHTML = `
-    <div style="font-size:11px;color:var(--text2);text-align:center;margin-bottom:6px">📍 黒塗りをドラッグしてカード番号の上に合わせてください</div>
+    <div style="font-size:11px;color:var(--text2);text-align:center;margin-bottom:6px">📍 ${label}：黒塗りをドラッグしてカード番号の上に合わせてください</div>
     <canvas id="maskCanvas" style="width:100%;border-radius:8px;display:block;touch-action:none"></canvas>
     <div style="display:flex;gap:8px;margin-top:10px;justify-content:center;flex-wrap:wrap">
       <button onclick="event.stopPropagation();resetMask()" style="padding:8px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">🔄 リセット</button>
-      <button onclick="event.stopPropagation();applyMaskAndShootBack()" style="padding:8px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">↩️ 裏面も撮影</button>
-      <button onclick="event.stopPropagation();applyMaskAndAnalyze()" style="padding:8px 12px;border-radius:20px;border:none;background:var(--primary);color:white;font-size:12px;font-weight:600;cursor:pointer">✅ 解析する</button>
+      ${backBtn}
+      <button onclick="event.stopPropagation();${analyzeOnClick}" style="padding:8px 12px;border-radius:20px;border:none;background:var(--primary);color:white;font-size:12px;font-weight:600;cursor:pointer">✅ 解析する</button>
     </div>`;
 
   maskImgEl = new Image();
@@ -1492,9 +1498,26 @@ function applyMask() {
   frontBase64Api = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
 }
 
-function applyMaskAndAnalyze() {
+function applyFrontMaskAndAnalyze() {
   applyMask();
   runAnalysis(null);
+  scanStep = 'idle';
+}
+
+function applyBackMaskAndAnalyze() {
+  // Apply mask to back image
+  const canvas = document.getElementById('maskCanvas');
+  if (canvas && maskImgEl) {
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(maskImgEl, 0, 0);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(maskRect.xr * canvas.width, maskRect.yr * canvas.height,
+                 maskRect.wr * canvas.width, maskRect.hr * canvas.height);
+    const maskedBack = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+    runAnalysis(maskedBack);
+  } else {
+    runAnalysis(backApiDataUrl ? backApiDataUrl.split(',')[1] : null);
+  }
   scanStep = 'idle';
 }
 
@@ -1578,9 +1601,10 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
     scanStep = 'front_done';
     showMaskUI(apiDataUrl);
   } else {
-    // Back photo captured — analyze both (front already masked)
-    await runAnalysis(base64);
-    scanStep = 'idle';
+    // Back photo captured — show back mask UI
+    backApiDataUrl = apiDataUrl;
+    scanStep = 'back_done';
+    showMaskUI(apiDataUrl, false);
   }
   e.target.value = '';
 });
