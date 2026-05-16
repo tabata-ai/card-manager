@@ -396,6 +396,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
 
     <div class="form-group">
+      <label class="form-label">カード番号（下4桁）</label>
+      <input type="text" id="input-last4" class="form-input" placeholder="例：1234" maxlength="4" inputmode="numeric" pattern="[0-9]*">
+      <div style="font-size:11px;color:var(--text2);margin-top:4px">スクリーンショットから自動入力されます</div>
+    </div>
+
+    <div class="form-group">
       <label class="form-label">メモ</label>
       <input type="text" id="input-memo" class="form-input" placeholder="例：ラウンジ特典あり、マイル還元1%">
     </div>
@@ -779,7 +785,7 @@ function renderCards() {
         ${thumbHtml}
         <div class="card-info">
           <div class="card-name">${c.name}</div>
-          <div class="card-meta">${c.date ? `発行日: ${c.date}` : ''}${c.expiry ? ` / 有効期限: ${c.expiry}` : ''}${c.billingType === 'fixed' ? ` / 請求: 毎年${c.billingMonth}月` : ''}</div>
+          <div class="card-meta">${c.date ? `発行日: ${c.date}` : ''}${c.expiry ? ` / 有効期限: ${c.expiry}` : ''}${c.last4 ? ` / **** ${c.last4}` : ''}${c.billingType === 'fixed' ? ` / 請求: 毎年${c.billingMonth}月` : ''}</div>
         </div>
         <div class="card-fee">
           <div class="amount">${totalCardCost(c) === 0 ? '無料' : fmtMoney(totalCardCost(c))}</div>
@@ -1321,6 +1327,7 @@ function saveCard() {
   const etcCount = Number(document.getElementById('input-etc-count').value) || 0;
   const etcFee = Number(document.getElementById('input-etc-fee').value) || 0;
   const expiry = document.getElementById('input-expiry-top').value;
+  const last4 = document.getElementById('input-last4').value.trim();
   const memo = document.getElementById('input-memo').value.trim();
   const billingTypeEl = document.querySelector('#billing-type-row .tag.selected');
   const billingType = billingTypeEl ? billingTypeEl.dataset.type : 'anniversary';
@@ -1334,7 +1341,7 @@ function saveCard() {
   if (!name) { showToast('カード名を入力してください'); return; }
   if (!date) { showToast('発行日を入力してください'); return; }
 
-  cards.push({ name, date, fee: fee || 0, familyCount, familyFee, etcCount, etcFee, expiry, memo, billingType, billingMonth, image: capturedImage || null, insType, insOverseas, insDomestic, insMemo });
+  cards.push({ name, date, fee: fee || 0, familyCount, familyFee, etcCount, etcFee, expiry, last4: last4 || null, memo, billingType, billingMonth, image: capturedImage || null, insType, insOverseas, insDomestic, insMemo });
   saveCards();
   showToast(`「${name}」を追加しました`);
   capturedImage = null;
@@ -1348,6 +1355,7 @@ function saveCard() {
   document.getElementById('input-etc-count').value = '';
   document.getElementById('input-etc-fee').value = '';
   document.getElementById('input-expiry-top').value = '';
+  document.getElementById('input-last4').value = '';
   document.getElementById('input-memo').value = '';
   selectedValidityYears = 0;
   document.querySelectorAll('#validity-row .tag').forEach(t => t.classList.remove('selected'));
@@ -1420,6 +1428,9 @@ async function runAnalysis(backBase64) {
         document.getElementById('fee-hint').textContent = '※ Geminiの推定値です。正確な金額は確認してください。';
         document.getElementById('fee-hint').style.color = 'var(--text2)';
       }
+    }
+    if (result.cardLast4 && /^\d{4}$/.test(result.cardLast4)) {
+      document.getElementById('input-last4').value = result.cardLast4;
     }
     showToast('カード情報を読み取りました！');
     document.getElementById('photo-content').innerHTML = `
@@ -1502,12 +1513,14 @@ async function analyzeWithGemini(base64, mimeType, apiKey, backBase64 = null) {
 見つからない場合はnullにしてください。
 annualFeeは画像から読み取れなくても、カード名から推測できる場合は標準的な年会費（税込円）を数値で入れてください。
 無料カードは0にしてください。
+cardLast4はカード番号の下4桁（16桁の最後の4桁）。スクリーンショットに「**** **** **** 1234」のような表示があれば抽出してください。
 
 {
   "cardName": "カード名（発行会社名とカード名。例：三井住友カード ゴールド）",
   "expiryDate": "有効期限（MM/YY形式）",
   "annualFee": 年会費の数値（税込円、例：11000）,
-  "feeNote": "年会費の補足（例：条件次第で無料、初年度無料など。特になければnull）"
+  "feeNote": "年会費の補足（例：条件次第で無料、初年度無料など。特になければnull）",
+  "cardLast4": "下4桁の数字文字列（例：1234）"
 }
 JSONのみ返してください。`;
 
