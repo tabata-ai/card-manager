@@ -538,9 +538,16 @@ const CARD_EMOJIS = ['💳','🟡','🔵','🟢','⚫','🔴','🟣','🟠','⚪
 const COLORS = ['#4F6EF7','#F59E0B','#10B981','#EF4444','#8B5CF6','#EC4899','#06B6D4','#84CC16'];
 
 let cards = JSON.parse(localStorage.getItem('cc_cards') || '[]');
-let capturedImage = null; // holds data URL of current card photo
-let frontBase64Api = null; // base64 of front image (API-sized)
-let scanStep = 'idle';    // 'idle' | 'front_done'
+let capturedImage = null;
+let frontBase64Api = null;
+let frontApiDataUrl = null;
+let scanStep = 'idle'; // 'idle' | 'front_done'
+// Mask state
+let maskRect = { xr: 0.04, yr: 0.50, wr: 0.92, hr: 0.16 };
+let isDraggingMask = false;
+let dragStartTouch = null;
+let maskRectAtDragStart = null;
+let maskImgEl = null;
 
 function saveCards() { localStorage.setItem('cc_cards', JSON.stringify(cards)); }
 
@@ -1392,14 +1399,108 @@ function resetPhotoArea() {
     <div class="sub">タップしてカメラを起動</div>`;
 }
 
-function showFrontDoneUI(thumbDataUrl) {
-  document.getElementById('photoArea').onclick = null; // disable area tap while buttons shown
+function showMaskUI(apiDataUrl) {
+  document.getElementById('photoArea').onclick = null;
+  maskRect = { xr: 0.04, yr: 0.50, wr: 0.92, hr: 0.16 };
   document.getElementById('photo-content').innerHTML = `
-    <img src="${thumbDataUrl}" style="width:100%;max-height:110px;object-fit:cover;border-radius:8px;margin-bottom:10px;">
-    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-      <button onclick="event.stopPropagation();document.getElementById('cameraInput').click()" style="padding:8px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-weight:600;cursor:pointer">↩️ 裏面も撮影</button>
-      <button onclick="event.stopPropagation();runAnalysis(null)" style="padding:8px 14px;border-radius:20px;border:none;background:var(--primary);color:white;font-size:13px;font-weight:600;cursor:pointer">✅ 解析する</button>
+    <div style="font-size:11px;color:var(--text2);text-align:center;margin-bottom:6px">📍 黒塗りをドラッグしてカード番号の上に合わせてください</div>
+    <canvas id="maskCanvas" style="width:100%;border-radius:8px;display:block;touch-action:none"></canvas>
+    <div style="display:flex;gap:8px;margin-top:10px;justify-content:center;flex-wrap:wrap">
+      <button onclick="event.stopPropagation();resetMask()" style="padding:8px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">🔄 リセット</button>
+      <button onclick="event.stopPropagation();applyMaskAndShootBack()" style="padding:8px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">↩️ 裏面も撮影</button>
+      <button onclick="event.stopPropagation();applyMaskAndAnalyze()" style="padding:8px 12px;border-radius:20px;border:none;background:var(--primary);color:white;font-size:12px;font-weight:600;cursor:pointer">✅ 解析する</button>
     </div>`;
+
+  maskImgEl = new Image();
+  maskImgEl.onload = () => {
+    const canvas = document.getElementById('maskCanvas');
+    if (!canvas) return;
+    canvas.width = maskImgEl.width;
+    canvas.height = maskImgEl.height;
+    drawMask();
+    setupMaskTouch(canvas);
+  };
+  maskImgEl.src = apiDataUrl;
+}
+
+function drawMask() {
+  const canvas = document.getElementById('maskCanvas');
+  if (!canvas || !maskImgEl) return;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(maskImgEl, 0, 0);
+  const mx = maskRect.xr * canvas.width;
+  const my = maskRect.yr * canvas.height;
+  const mw = maskRect.wr * canvas.width;
+  const mh = maskRect.hr * canvas.height;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(mx, my, mw, mh);
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = Math.max(2, canvas.width * 0.004);
+  ctx.setLineDash([8, 4]);
+  ctx.strokeRect(mx + 1, my + 1, mw - 2, mh - 2);
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = `${Math.round(mh * 0.45)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('↕ ドラッグ', mx + mw / 2, my + mh / 2);
+}
+
+function setupMaskTouch(canvas) {
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    isDraggingMask = true;
+    dragStartTouch = {
+      x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+      y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+    };
+    maskRectAtDragStart = { ...maskRect };
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (!isDraggingMask) return;
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const tx = (touch.clientX - rect.left) * (canvas.width / rect.width);
+    const ty = (touch.clientY - rect.top) * (canvas.height / rect.height);
+    const dx = (tx - dragStartTouch.x) / canvas.width;
+    const dy = (ty - dragStartTouch.y) / canvas.height;
+    maskRect.xr = Math.max(0, Math.min(1 - maskRect.wr, maskRectAtDragStart.xr + dx));
+    maskRect.yr = Math.max(0, Math.min(1 - maskRect.hr, maskRectAtDragStart.yr + dy));
+    drawMask();
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', () => { isDraggingMask = false; });
+}
+
+function resetMask() {
+  maskRect = { xr: 0.04, yr: 0.50, wr: 0.92, hr: 0.16 };
+  drawMask();
+}
+
+function applyMask() {
+  const canvas = document.getElementById('maskCanvas');
+  if (!canvas || !maskImgEl) return;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(maskImgEl, 0, 0);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(maskRect.xr * canvas.width, maskRect.yr * canvas.height,
+               maskRect.wr * canvas.width, maskRect.hr * canvas.height);
+  frontBase64Api = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+}
+
+function applyMaskAndAnalyze() {
+  applyMask();
+  runAnalysis(null);
+  scanStep = 'idle';
+}
+
+function applyMaskAndShootBack() {
+  applyMask();
+  document.getElementById('cameraInput').click();
 }
 
 async function runAnalysis(backBase64) {
@@ -1470,13 +1571,14 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
   const base64 = apiDataUrl.split(',')[1];
 
   if (scanStep === 'idle') {
-    // Front photo captured
+    // Front photo captured — show mask UI
     frontBase64Api = base64;
+    frontApiDataUrl = apiDataUrl;
     capturedImage = thumbDataUrl;
     scanStep = 'front_done';
-    showFrontDoneUI(thumbDataUrl);
+    showMaskUI(apiDataUrl);
   } else {
-    // Back photo captured — analyze both
+    // Back photo captured — analyze both (front already masked)
     await runAnalysis(base64);
     scanStep = 'idle';
   }
