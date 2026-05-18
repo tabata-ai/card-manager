@@ -1134,50 +1134,134 @@ function selectInsType(type, el) {
 
 // ===== カードプリセットDB =====
 const CARD_PRESETS = {
-  // Amex
-  'Amex グリーン':           { fee: 13200,  billingType: 'anniversary', familyFee: 13200, etcFee: 0,    note: '家族カードは同額' },
-  'Amex ゴールド':           { fee: 31900,  billingType: 'anniversary', familyFee: 13200, etcFee: 0,    note: '家族カード13,200円' },
-  'Amex プラチナ':           { fee: 165000, billingType: 'anniversary', familyFee: 4400,  etcFee: 0,    note: '家族カード4名まで無料' },
-  // 楽天
-  '楽天カード':              { fee: 0,      billingType: 'anniversary', familyFee: 550,   etcFee: 550,  note: '年会費永年無料' },
-  '楽天ゴールドカード':      { fee: 2200,   billingType: 'anniversary', familyFee: 550,   etcFee: 550 },
-  '楽天プレミアムカード':    { fee: 11000,  billingType: 'anniversary', familyFee: 550,   etcFee: 550 },
-  '楽天ブラックカード':      { fee: 33000,  billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '家族カード無料' },
-  // 三井住友
-  '三井住友カード(NL)':      { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 550,  note: '永年無料' },
-  '三井住友カード ゴールド(NL)': { fee: 5500, billingType: 'anniversary', familyFee: 0, etcFee: 550,   note: '100万円達成で翌年以降永年無料' },
-  '三井住友カード プラチナプリファード': { fee: 33000, billingType: 'anniversary', familyFee: 0, etcFee: 550 },
-  '三井住友カード プラチナ': { fee: 55000,  billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '家族カード無料' },
-  // JCB
-  'JCBカード W':             { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
-  'JCBゴールド':             { fee: 11000,  billingType: 'anniversary', familyFee: 1100,  etcFee: 0 },
-  'JCBゴールド ザ・プレミア': { fee: 0,     billingType: 'anniversary', familyFee: 1100,  etcFee: 0,    note: '招待制・条件達成で無料' },
-  'JCBプラチナ':             { fee: 27500,  billingType: 'anniversary', familyFee: 1650,  etcFee: 0 },
-  'JCB ザ・クラス':          { fee: 55000,  billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '招待制・家族カード無料' },
-  // イオン
-  'イオンカード':            { fee: 0,      billingType: 'fixed', billingMonth: 2, familyFee: 0, etcFee: 0, note: '永年無料' },
-  'イオンゴールドカード':    { fee: 0,      billingType: 'fixed', billingMonth: 2, familyFee: 0, etcFee: 0, note: '招待制・永年無料' },
-  // dカード
-  'dカード':                 { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
-  'dカード GOLD':            { fee: 11000,  billingType: 'anniversary', familyFee: 1100,  etcFee: 0 },
-  'dカード PLATINUM':        { fee: 33000,  billingType: 'anniversary', familyFee: 0,     etcFee: 0 },
-  // エポス
-  'エポスカード':            { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
-  'エポスゴールドカード':    { fee: 5000,   billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '招待制で永年無料' },
-  'エポスプラチナカード':    { fee: 30000,  billingType: 'anniversary', familyFee: 0,     etcFee: 0 },
-  // マリオット
-  'マリオットボンヴォイアメックス':          { fee: 23100, billingType: 'anniversary', familyFee: 13200, etcFee: 0 },
-  'マリオットボンヴォイアメックスプレミアム': { fee: 49500, billingType: 'anniversary', familyFee: 24750, etcFee: 0 },
-  // セゾン
-  'セゾンパールアメックス':  { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: 'デジタル版は永年無料' },
-  'セゾンゴールドアメックス': { fee: 0,     billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '年100万円以上で永年無料' },
-  'セゾンプラチナアメックス': { fee: 22000, billingType: 'anniversary', familyFee: 3300,  etcFee: 0 },
-  // ビューカード
-  'ビューカード':            { fee: 524,    billingType: 'anniversary', familyFee: 0,     etcFee: 0 },
-  'ビューゴールドプラスカード': { fee: 11000, billingType: 'anniversary', familyFee: 3300, etcFee: 0 },
-  // PayPay
-  'PayPayカード':            { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0 },
-  'PayPayカード ゴールド':   { fee: 11000,  billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '家族カード無料' },
+  // ===== Amex =====
+  'Amex グリーン':                      { fee: 13200,  billingType: 'anniversary', familyFee: 13200, etcFee: 0 },
+  'Amex ゴールド':                      { fee: 31900,  billingType: 'anniversary', familyFee: 13200, etcFee: 0 },
+  'Amex プラチナ':                      { fee: 165000, billingType: 'anniversary', familyFee: 4400,  etcFee: 0,  note: '家族4名まで無料' },
+  'Amex センチュリオン':                { fee: 385000, billingType: 'anniversary', familyFee: 0,     etcFee: 0,  note: '招待制' },
+  'Amex ビジネス グリーン':             { fee: 13200,  billingType: 'anniversary', familyFee: 6600,  etcFee: 0 },
+  'Amex ビジネス ゴールド':             { fee: 36300,  billingType: 'anniversary', familyFee: 13200, etcFee: 0 },
+  'Amex ビジネス プラチナ':             { fee: 165000, billingType: 'anniversary', familyFee: 0,     etcFee: 0 },
+  // ===== 楽天 =====
+  '楽天カード':                         { fee: 0,      billingType: 'anniversary', familyFee: 550,   etcFee: 550,  note: '永年無料' },
+  '楽天PINKカード':                     { fee: 0,      billingType: 'anniversary', familyFee: 550,   etcFee: 550,  note: '永年無料' },
+  '楽天ゴールドカード':                 { fee: 2200,   billingType: 'anniversary', familyFee: 550,   etcFee: 550 },
+  '楽天プレミアムカード':               { fee: 11000,  billingType: 'anniversary', familyFee: 550,   etcFee: 550 },
+  '楽天ブラックカード':                 { fee: 33000,  billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '家族カード無料' },
+  '楽天ANAマイレージクラブカード':      { fee: 550,    billingType: 'anniversary', familyFee: 0,     etcFee: 550 },
+  // ===== 三井住友 =====
+  '三井住友カード(NL)':                 { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 550,  note: '永年無料' },
+  '三井住友カード ゴールド(NL)':        { fee: 5500,   billingType: 'anniversary', familyFee: 0,     etcFee: 550,  note: '100万円達成で翌年以降永年無料' },
+  '三井住友カード プラチナプリファード':{ fee: 33000,  billingType: 'anniversary', familyFee: 0,     etcFee: 550 },
+  '三井住友カード プラチナ':            { fee: 55000,  billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '家族カード無料' },
+  '三井住友カード ゴールド':            { fee: 11000,  billingType: 'anniversary', familyFee: 1100,  etcFee: 550 },
+  'Oliveフレキシブルペイ':              { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 550,  note: '永年無料' },
+  'Oliveフレキシブルペイ ゴールド':     { fee: 5500,   billingType: 'anniversary', familyFee: 0,     etcFee: 550,  note: '100万円達成で翌年以降永年無料' },
+  'Oliveフレキシブルペイ プラチナプリファード': { fee: 33000, billingType: 'anniversary', familyFee: 0, etcFee: 550 },
+  // ===== JCB =====
+  'JCBカード':                          { fee: 1375,   billingType: 'anniversary', familyFee: 440,   etcFee: 0 },
+  'JCBカード W':                        { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料・18〜39歳限定' },
+  'JCBカード W plus L':                 { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料・18〜39歳限定' },
+  'JCBゴールド':                        { fee: 11000,  billingType: 'anniversary', familyFee: 1100,  etcFee: 0 },
+  'JCBゴールド ザ・プレミア':           { fee: 0,      billingType: 'anniversary', familyFee: 1100,  etcFee: 0,    note: '招待制・条件達成で無料' },
+  'JCBプラチナ':                        { fee: 27500,  billingType: 'anniversary', familyFee: 1650,  etcFee: 0 },
+  'JCB ザ・クラス':                     { fee: 55000,  billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '招待制・家族カード無料' },
+  // ===== イオン =====
+  'イオンカード':                       { fee: 0,      billingType: 'fixed', billingMonth: 2, familyFee: 0, etcFee: 0, note: '永年無料' },
+  'イオンゴールドカード':               { fee: 0,      billingType: 'fixed', billingMonth: 2, familyFee: 0, etcFee: 0, note: '招待制・永年無料' },
+  'イオンカード(WAON一体型)':           { fee: 0,      billingType: 'fixed', billingMonth: 2, familyFee: 0, etcFee: 0, note: '永年無料' },
+  'イオンカード Suica':                 { fee: 0,      billingType: 'fixed', billingMonth: 2, familyFee: 0, etcFee: 0, note: '永年無料' },
+  // ===== dカード =====
+  'dカード':                            { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  'dカード GOLD':                       { fee: 11000,  billingType: 'anniversary', familyFee: 1100,  etcFee: 0 },
+  'dカード PLATINUM':                   { fee: 33000,  billingType: 'anniversary', familyFee: 0,     etcFee: 0 },
+  // ===== エポス =====
+  'エポスカード':                       { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  'エポスゴールドカード':               { fee: 5000,   billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '招待制で永年無料' },
+  'エポスプラチナカード':               { fee: 30000,  billingType: 'anniversary', familyFee: 0,     etcFee: 0 },
+  // ===== マリオット =====
+  'マリオットボンヴォイアメックス':                  { fee: 23100, billingType: 'anniversary', familyFee: 13200, etcFee: 0 },
+  'マリオットボンヴォイアメックスプレミアム':        { fee: 49500, billingType: 'anniversary', familyFee: 24750, etcFee: 0 },
+  // ===== ヒルトン =====
+  'ヒルトン・オナーズ アメックス':              { fee: 16500,  billingType: 'anniversary', familyFee: 6600,  etcFee: 0 },
+  'ヒルトン・オナーズ アメックス プレミアム':   { fee: 66000,  billingType: 'anniversary', familyFee: 33000, etcFee: 0 },
+  // ===== セゾン =====
+  'セゾンカード インターナショナル':    { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  'セゾンパールアメックス':             { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: 'デジタル版は永年無料' },
+  'セゾンゴールドアメックス':           { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '年100万円以上で永年無料' },
+  'セゾンゴールドプレミアム':           { fee: 11000,  billingType: 'anniversary', familyFee: 1100,  etcFee: 0 },
+  'セゾンプラチナアメックス':           { fee: 22000,  billingType: 'anniversary', familyFee: 3300,  etcFee: 0 },
+  'セゾンプラチナビジネスアメックス':   { fee: 22000,  billingType: 'anniversary', familyFee: 3300,  etcFee: 0 },
+  // ===== ビューカード =====
+  'ビューカード':                       { fee: 524,    billingType: 'anniversary', familyFee: 0,     etcFee: 0 },
+  'ビューゴールドプラスカード':         { fee: 11000,  billingType: 'anniversary', familyFee: 3300,  etcFee: 0 },
+  'ルミネカード':                       { fee: 1048,   billingType: 'anniversary', familyFee: 0,     etcFee: 0 },
+  'ビュー・スイカカード':               { fee: 524,    billingType: 'anniversary', familyFee: 0,     etcFee: 0 },
+  // ===== PayPay =====
+  'PayPayカード':                       { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0 },
+  'PayPayカード ゴールド':              { fee: 11000,  billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '家族カード無料' },
+  // ===== au PAY =====
+  'au PAYカード':                       { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  'au PAY ゴールドカード':              { fee: 11000,  billingType: 'anniversary', familyFee: 2750,  etcFee: 0 },
+  // ===== ANA =====
+  'ANAカード（一般）':                  { fee: 2200,   billingType: 'anniversary', familyFee: 1100,  etcFee: 0 },
+  'ANAカード（ワイド）':                { fee: 7975,   billingType: 'anniversary', familyFee: 2475,  etcFee: 0 },
+  'ANAカード ゴールド':                 { fee: 15400,  billingType: 'anniversary', familyFee: 4400,  etcFee: 0 },
+  'ANA JCBカード':                      { fee: 2200,   billingType: 'anniversary', familyFee: 1100,  etcFee: 0 },
+  'ANA JCBワイドゴールドカード':        { fee: 15400,  billingType: 'anniversary', familyFee: 4400,  etcFee: 0 },
+  'ANA VISAカード':                     { fee: 2200,   billingType: 'anniversary', familyFee: 1100,  etcFee: 0 },
+  'ANA VISAワイドゴールドカード':       { fee: 15400,  billingType: 'anniversary', familyFee: 4400,  etcFee: 0 },
+  'ANA アメックス':                     { fee: 7700,   billingType: 'anniversary', familyFee: 2750,  etcFee: 0 },
+  'ANA アメックス ゴールド':            { fee: 34100,  billingType: 'anniversary', familyFee: 17050, etcFee: 0 },
+  'ANA ダイナースクラブカード':         { fee: 29700,  billingType: 'anniversary', familyFee: 6600,  etcFee: 0 },
+  'ANAスーパーフライヤーズカード':      { fee: 11275,  billingType: 'anniversary', familyFee: 2475,  etcFee: 0,    note: 'SFC・搭乗実績要件あり' },
+  'ANA To Me CARD PASMO JCB（ソラチカ）': { fee: 2200, billingType: 'anniversary', familyFee: 1100, etcFee: 0 },
+  // ===== JAL =====
+  'JALカード（一般）':                  { fee: 2200,   billingType: 'anniversary', familyFee: 1100,  etcFee: 0 },
+  'JALカード CLUB-A':                   { fee: 11000,  billingType: 'anniversary', familyFee: 3300,  etcFee: 0 },
+  'JALカード CLUB-A ゴールド':          { fee: 17600,  billingType: 'anniversary', familyFee: 8800,  etcFee: 0 },
+  'JALカード プラチナ':                 { fee: 34100,  billingType: 'anniversary', familyFee: 17050, etcFee: 0 },
+  'JAL アメックス':                     { fee: 6600,   billingType: 'anniversary', familyFee: 3300,  etcFee: 0 },
+  'JAL アメックス プラチナ':            { fee: 34100,  billingType: 'anniversary', familyFee: 17050, etcFee: 0 },
+  'JALカード Suica':                    { fee: 2200,   billingType: 'anniversary', familyFee: 1100,  etcFee: 0 },
+  // ===== 三菱UFJ / MUFG =====
+  '三菱UFJカード':                      { fee: 1375,   billingType: 'anniversary', familyFee: 440,   etcFee: 0 },
+  '三菱UFJカード ゴールドプレステージ': { fee: 11000,  billingType: 'anniversary', familyFee: 2750,  etcFee: 0 },
+  '三菱UFJカード プラチナ アメックス':  { fee: 22000,  billingType: 'anniversary', familyFee: 3300,  etcFee: 0 },
+  '三菱UFJカード VIASOカード':          { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  // ===== リクルート =====
+  'リクルートカード':                   { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  // ===== ライフカード =====
+  'ライフカード':                       { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  'ライフカード ゴールド':              { fee: 11000,  billingType: 'anniversary', familyFee: 2750,  etcFee: 0 },
+  // ===== Orico =====
+  'Orico Card THE POINT':               { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  'Orico Card THE GOLD PRIME':          { fee: 11000,  billingType: 'anniversary', familyFee: 1100,  etcFee: 0 },
+  // ===== ダイナース =====
+  'ダイナースクラブカード':             { fee: 24200,  billingType: 'anniversary', familyFee: 5500,  etcFee: 0 },
+  'ダイナースクラブ プレミアムカード':  { fee: 143000, billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '招待制' },
+  // ===== TRUST CLUB =====
+  'TRUST CLUB プラチナマスターカード':  { fee: 3300,   billingType: 'anniversary', familyFee: 0,     etcFee: 0 },
+  'TRUST CLUB ワールドカード':          { fee: 13200,  billingType: 'anniversary', familyFee: 4400,  etcFee: 0 },
+  'TRUST CLUB ワールドエリートカード':  { fee: 143000, billingType: 'anniversary', familyFee: 0,     etcFee: 0 },
+  // ===== コンビニ・流通系 =====
+  'セブンカード・プラス':               { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  'ファミマTカード':                    { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  'ローソンPontaプラス':                { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  // ===== メルカード =====
+  'メルカード':                         { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  // ===== 住信SBIネット銀行 =====
+  'Nexus Card':                         { fee: 1375,   billingType: 'anniversary', familyFee: 440,   etcFee: 0 },
+  // ===== P-One =====
+  'P-Oneカード<Standard>':              { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  // ===== トヨタ =====
+  'TS CUBIC CARD':                      { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料' },
+  'TS CUBIC CARD GOLD':                 { fee: 6600,   billingType: 'anniversary', familyFee: 3300,  etcFee: 0 },
+  'レクサスカード':                     { fee: 0,      billingType: 'anniversary', familyFee: 0,     etcFee: 0,    note: '永年無料・レクサスオーナー限定' },
+  // ===== UC / ニコス =====
+  'UCカード':                           { fee: 1375,   billingType: 'anniversary', familyFee: 440,   etcFee: 0 },
+  'UCカード ゴールド':                  { fee: 11000,  billingType: 'anniversary', familyFee: 2750,  etcFee: 0 },
+  'MUFGカード ゴールド':                { fee: 2095,   billingType: 'anniversary', familyFee: 440,   etcFee: 0 },
 };
 
 // ===== カード検索UI =====
