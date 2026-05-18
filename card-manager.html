@@ -258,12 +258,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <!-- CARDS -->
 <div class="page" id="page-cards">
   <div class="header">
-    <h1>カード一覧</h1>
+    <h1 id="cards-title">カード一覧</h1>
     <p id="cards-subtitle"></p>
   </div>
-  <div class="section">
+  <div class="sub-tabs">
+    <button class="sub-tab active" id="ctab-list" onclick="showCardTab('list')">💳 カード一覧</button>
+    <button class="sub-tab" id="ctab-recommend" onclick="showCardTab('recommend')">💡 おすすめ</button>
+  </div>
+  <div class="section" id="csec-list">
     <button class="btn-sm" id="add-all-cal-btn" onclick="addAllToCalendar()" style="width:100%;padding:12px;margin-bottom:12px;font-size:14px;">📅 全カードをカレンダーに追加</button>
     <div id="card-list"></div>
+  </div>
+  <div class="section" id="csec-recommend" style="display:none">
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">利用先を選ぶと、所有カードの中でいちばん還元率が高いカードを表示します。</p>
+    <div id="recommend-cats" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px"></div>
+    <div id="recommend-result"></div>
   </div>
 </div>
 
@@ -649,6 +658,101 @@ function selectAiMode(mode, el) {
   localStorage.setItem('cc_aimode', mode);
   document.getElementById('worker-url-section').style.display = mode === 'worker' ? 'block' : 'none';
   document.getElementById('direct-key-section').style.display  = mode === 'direct' ? 'block' : 'none';
+}
+
+// ===== カードサブタブ =====
+function showCardTab(tab) {
+  ['list','recommend'].forEach(t => {
+    document.getElementById('ctab-' + t).classList.toggle('active', t === tab);
+    document.getElementById('csec-' + t).style.display = t === tab ? '' : 'none';
+  });
+  if (tab === 'recommend') {
+    document.getElementById('cards-title').textContent = '💡 利用先おすすめ';
+    renderRecommendCats();
+  } else {
+    document.getElementById('cards-title').textContent = 'カード一覧';
+  }
+}
+
+const RECOMMEND_CATS = [
+  {key:'convenience', label:'コンビニ',    emoji:'🏪'},
+  {key:'supermarket', label:'スーパー',    emoji:'🛒'},
+  {key:'amazon',      label:'Amazon',      emoji:'📦'},
+  {key:'rakuten',     label:'楽天市場',    emoji:'🅡'},
+  {key:'yahoo',       label:'Yahoo/PayPay',emoji:'🔴'},
+  {key:'gas',         label:'ガソリン',    emoji:'⛽'},
+  {key:'restaurant',  label:'飲食店',      emoji:'🍽'},
+  {key:'travel',      label:'旅行',        emoji:'✈️'},
+  {key:'transport',   label:'交通',        emoji:'🚃'},
+  {key:'mobile',      label:'携帯料金',    emoji:'📱'},
+];
+
+let selectedCat = null;
+
+function renderRecommendCats() {
+  const el = document.getElementById('recommend-cats');
+  if (el.innerHTML) return;
+  el.innerHTML = RECOMMEND_CATS.map(c =>
+    `<button id="rcat-${c.key}" onclick="selectCat('${c.key}')"
+      style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 12px;border:1.5px solid var(--border);border-radius:12px;background:var(--card);cursor:pointer;min-width:72px;font-size:11px;color:var(--text2);font-weight:600;transition:all .2s">
+      <span style="font-size:22px">${c.emoji}</span>${c.label}
+    </button>`
+  ).join('');
+  if (selectedCat) selectCat(selectedCat);
+}
+
+function selectCat(key) {
+  selectedCat = key;
+  RECOMMEND_CATS.forEach(c => {
+    const btn = document.getElementById('rcat-' + c.key);
+    if (!btn) return;
+    if (c.key === key) {
+      btn.style.borderColor = 'var(--primary)';
+      btn.style.background = 'var(--primary-light)';
+      btn.style.color = 'var(--primary)';
+    } else {
+      btn.style.borderColor = 'var(--border)';
+      btn.style.background = 'var(--card)';
+      btn.style.color = 'var(--text2)';
+    }
+  });
+  renderRecommendResult(key);
+}
+
+function renderRecommendResult(catKey) {
+  const el = document.getElementById('recommend-result');
+  if (!cards.length) {
+    el.innerHTML = '<p style="color:var(--text2);font-size:13px">カードを登録してください。</p>';
+    return;
+  }
+  const cat = RECOMMEND_CATS.find(c => c.key === catKey);
+  const scored = cards.map(c => {
+    const preset = CARD_PRESETS[c.name] || Object.entries(CARD_PRESETS).find(([k])=>c.name&&(c.name.includes(k)||k.includes(c.name)))?.[1];
+    const base = preset ? (preset.baseRate || 0.5) : 0.5;
+    const bonus = preset && preset.bonusRates ? (preset.bonusRates[catKey] || base) : base;
+    const rate = Math.max(base, bonus);
+    return { card: c, rate, isBonus: bonus > base };
+  }).sort((a, b) => b.rate - a.rate);
+
+  const best = scored[0];
+  el.innerHTML = `
+    <div style="margin-bottom:12px;font-size:13px;font-weight:600;color:var(--text2)">${cat.emoji} ${cat.label}での所有カード還元率ランキング</div>
+    ${scored.map((s, i) => {
+      const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}位`;
+      const rateStr = s.rate % 1 === 0 ? s.rate + '.0' : s.rate.toString();
+      const isTop = i === 0;
+      const bonusBadge = s.isBonus ? `<span style="font-size:10px;background:var(--primary-light);color:var(--primary);border-radius:4px;padding:1px 5px;margin-left:6px">ボーナス${rateStr}%</span>` : '';
+      return `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:${isTop?'var(--primary-light)':'var(--bg)'};border:${isTop?'1.5px solid var(--primary)':'1px solid var(--border)'};margin-bottom:8px">
+        <div style="font-size:18px;min-width:28px;text-align:center">${rank}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;color:${isTop?'var(--primary)':'var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.card.name}${bonusBadge}</div>
+          ${s.card.last4?`<div style="font-size:11px;color:var(--text2)">**** ${s.card.last4}</div>`:''}
+        </div>
+        <div style="font-size:20px;font-weight:700;color:${isTop?'var(--primary)':'var(--text)'};min-width:48px;text-align:right">${rateStr}%</div>
+      </div>`;
+    }).join('')}
+    ${scored.some(s=>!CARD_PRESETS[s.card.name]&&!Object.keys(CARD_PRESETS).some(k=>s.card.name&&(s.card.name.includes(k)||k.includes(s.card.name))))?'<p style="font-size:11px;color:var(--text2);margin-top:8px">※一部のカードは還元率データ未登録のため基本0.5%として表示しています。</p>':''}
+  `;
 }
 
 function showPage(id, btn) {
@@ -1147,55 +1251,55 @@ const CARD_PRESETS = {
   'Amex ビジネス グリーン': {fee:13200, billingType:'anniversary', familyFee:6600, etcFee:0, note:null, perks:["海外旅行保険", "ショッピング保険", "国内空港ラウンジ", "グルメ優待"]},
   'Amex ビジネス ゴールド': {fee:36300, billingType:'anniversary', familyFee:13200, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "コンシェルジュ", "グルメ優待"]},
   'Amex ビジネス プラチナ': {fee:165000, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "PP無料", "国内空港ラウンジ", "コンシェルジュ", "グルメ優待", "ゴルフ優待"]},
-  '楽天カード': {fee:0, billingType:'anniversary', familyFee:550, etcFee:550, note:'永年無料', perks:["海外旅行保険"]},
-  '楽天PINKカード': {fee:0, billingType:'anniversary', familyFee:550, etcFee:550, note:'永年無料', perks:["海外旅行保険"]},
-  '楽天ゴールドカード': {fee:2200, billingType:'anniversary', familyFee:550, etcFee:550, note:null, perks:["海外旅行保険", "国内空港ラウンジ年2回"]},
-  '楽天プレミアムカード': {fee:11000, billingType:'anniversary', familyFee:550, etcFee:550, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "PP無料", "国内空港ラウンジ"]},
-  '楽天ブラックカード': {fee:33000, billingType:'anniversary', familyFee:0, etcFee:0, note:'家族カード無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "PP無料", "国内空港ラウンジ", "コンシェルジュ"]},
-  '楽天ANAマイレージクラブカード': {fee:550, billingType:'anniversary', familyFee:0, etcFee:550, note:null, perks:["海外旅行保険", "マイル積算"]},
-  '三井住友カード(NL)': {fee:0, billingType:'anniversary', familyFee:0, etcFee:550, note:'永年無料', perks:["海外旅行保険", "ショッピング保険"]},
-  '三井住友カード ゴールド(NL)': {fee:5500, billingType:'anniversary', familyFee:0, etcFee:550, note:'100万円達成で翌年以降永年無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ"]},
-  '三井住友カード プラチナプリファード': {fee:33000, billingType:'anniversary', familyFee:0, etcFee:550, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "コンシェルジュ"]},
-  '三井住友カード プラチナ': {fee:55000, billingType:'anniversary', familyFee:0, etcFee:0, note:'家族カード無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "PP無料", "国内空港ラウンジ", "コンシェルジュ", "グルメ優待", "ゴルフ優待"]},
-  '三井住友カード ゴールド': {fee:11000, billingType:'anniversary', familyFee:1100, etcFee:550, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ"]},
-  'Oliveフレキシブルペイ': {fee:0, billingType:'anniversary', familyFee:0, etcFee:550, note:'永年無料', perks:["海外旅行保険", "ショッピング保険"]},
-  'Oliveフレキシブルペイ ゴールド': {fee:5500, billingType:'anniversary', familyFee:0, etcFee:550, note:'100万円達成で翌年以降永年無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ"]},
-  'Oliveフレキシブルペイ プラチナプリファード': {fee:33000, billingType:'anniversary', familyFee:0, etcFee:550, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "コンシェルジュ"]},
-  'JCBカード': {fee:1375, billingType:'anniversary', familyFee:440, etcFee:0, note:null, perks:["海外旅行保険", "ショッピング保険"]},
-  'JCBカード W': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料・18〜39歳限定', perks:["海外旅行保険", "ショッピング保険"]},
-  'JCBカード W plus L': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料・18〜39歳限定', perks:["海外旅行保険", "ショッピング保険"]},
-  'JCBゴールド': {fee:11000, billingType:'anniversary', familyFee:1100, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "グルメ優待"]},
+  '楽天カード': {fee:0, billingType:'anniversary', familyFee:550, etcFee:550, note:'永年無料', perks:["海外旅行保険"], baseRate:1.0, bonusRates:{'rakuten':3}},
+  '楽天PINKカード': {fee:0, billingType:'anniversary', familyFee:550, etcFee:550, note:'永年無料', perks:["海外旅行保険"], baseRate:1.0, bonusRates:{'rakuten':3}},
+  '楽天ゴールドカード': {fee:2200, billingType:'anniversary', familyFee:550, etcFee:550, note:null, perks:["海外旅行保険", "国内空港ラウンジ年2回"], baseRate:1.0, bonusRates:{'rakuten':4}},
+  '楽天プレミアムカード': {fee:11000, billingType:'anniversary', familyFee:550, etcFee:550, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "PP無料", "国内空港ラウンジ"], baseRate:1.0, bonusRates:{'rakuten':5}},
+  '楽天ブラックカード': {fee:33000, billingType:'anniversary', familyFee:0, etcFee:0, note:'家族カード無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "PP無料", "国内空港ラウンジ", "コンシェルジュ"], baseRate:1.2, bonusRates:{'rakuten':6}},
+  '楽天ANAマイレージクラブカード': {fee:550, billingType:'anniversary', familyFee:0, etcFee:550, note:null, perks:["海外旅行保険", "マイル積算"], baseRate:1.0, bonusRates:{'rakuten':2}},
+  '三井住友カード(NL)': {fee:0, billingType:'anniversary', familyFee:0, etcFee:550, note:'永年無料', perks:["海外旅行保険", "ショッピング保険"], baseRate:0.5, bonusRates:{'convenience':5,'restaurant':5}},
+  '三井住友カード ゴールド(NL)': {fee:5500, billingType:'anniversary', familyFee:0, etcFee:550, note:'100万円達成で翌年以降永年無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ"], baseRate:0.5, bonusRates:{'convenience':5,'restaurant':5}},
+  '三井住友カード プラチナプリファード': {fee:33000, billingType:'anniversary', familyFee:0, etcFee:550, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "コンシェルジュ"], baseRate:1.0, bonusRates:{'convenience':5}},
+  '三井住友カード プラチナ': {fee:55000, billingType:'anniversary', familyFee:0, etcFee:0, note:'家族カード無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "PP無料", "国内空港ラウンジ", "コンシェルジュ", "グルメ優待", "ゴルフ優待"], baseRate:0.5, bonusRates:{'convenience':5,'restaurant':5}},
+  '三井住友カード ゴールド': {fee:11000, billingType:'anniversary', familyFee:1100, etcFee:550, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ"], baseRate:0.5, bonusRates:{'convenience':5,'restaurant':5}},
+  'Oliveフレキシブルペイ': {fee:0, billingType:'anniversary', familyFee:0, etcFee:550, note:'永年無料', perks:["海外旅行保険", "ショッピング保険"], baseRate:0.5, bonusRates:{'convenience':5,'restaurant':5}},
+  'Oliveフレキシブルペイ ゴールド': {fee:5500, billingType:'anniversary', familyFee:0, etcFee:550, note:'100万円達成で翌年以降永年無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ"], baseRate:0.5, bonusRates:{'convenience':5,'restaurant':5}},
+  'Oliveフレキシブルペイ プラチナプリファード': {fee:33000, billingType:'anniversary', familyFee:0, etcFee:550, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "コンシェルジュ"], baseRate:1.0, bonusRates:{'convenience':5}},
+  'JCBカード': {fee:1375, billingType:'anniversary', familyFee:440, etcFee:0, note:null, perks:["海外旅行保険", "ショッピング保険"], baseRate:0.5, bonusRates:{}},
+  'JCBカード W': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料・18〜39歳限定', perks:["海外旅行保険", "ショッピング保険"], baseRate:1.0, bonusRates:{'amazon':2,'convenience':2}},
+  'JCBカード W plus L': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料・18〜39歳限定', perks:["海外旅行保険", "ショッピング保険"], baseRate:1.0, bonusRates:{'amazon':2,'convenience':2}},
+  'JCBゴールド': {fee:11000, billingType:'anniversary', familyFee:1100, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "グルメ優待"], baseRate:0.5, bonusRates:{'travel':1}},
   'JCBゴールド ザ・プレミア': {fee:0, billingType:'anniversary', familyFee:1100, etcFee:0, note:'招待制・条件達成で無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "PP有料", "コンシェルジュ", "グルメ優待"]},
-  'JCBプラチナ': {fee:27500, billingType:'anniversary', familyFee:1650, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "PP無料", "コンシェルジュ", "グルメ優待", "ゴルフ優待"]},
-  'JCB ザ・クラス': {fee:55000, billingType:'anniversary', familyFee:0, etcFee:0, note:'招待制・家族カード無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "PP無料", "コンシェルジュ", "グルメ優待", "ゴルフ優待", "ディズニー特典"]},
-  'イオンカード': {fee:0, billingType:'fixed', familyFee:0, etcFee:0, note:'永年無料', perks:["ショッピング保険", "イオン優待"]},
-  'イオンゴールドカード': {fee:0, billingType:'fixed', familyFee:0, etcFee:0, note:'招待制・永年無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "イオン優待"]},
-  'イオンカード(WAON一体型)': {fee:0, billingType:'fixed', familyFee:0, etcFee:0, note:'永年無料', perks:["ショッピング保険", "イオン優待", "WAONポイント"]},
-  'イオンカード Suica': {fee:0, billingType:'fixed', familyFee:0, etcFee:0, note:'永年無料', perks:["ショッピング保険", "イオン優待", "Suicaチャージ"]},
-  'dカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険", "ショッピング保険", "ケータイ補償"]},
-  'dカード GOLD': {fee:11000, billingType:'anniversary', familyFee:1100, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "ケータイ補償"]},
-  'dカード PLATINUM': {fee:33000, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "PP無料", "ケータイ補償", "コンシェルジュ"]},
-  'エポスカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険"]},
-  'エポスゴールドカード': {fee:5000, billingType:'anniversary', familyFee:0, etcFee:0, note:'招待制で永年無料', perks:["海外旅行保険", "国内空港ラウンジ"]},
-  'エポスプラチナカード': {fee:30000, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "国内空港ラウンジ", "PP無料", "コンシェルジュ", "グルメ優待"]},
+  'JCBプラチナ': {fee:27500, billingType:'anniversary', familyFee:1650, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "PP無料", "コンシェルジュ", "グルメ優待", "ゴルフ優待"], baseRate:0.5, bonusRates:{'travel':1,'restaurant':2}},
+  'JCB ザ・クラス': {fee:55000, billingType:'anniversary', familyFee:0, etcFee:0, note:'招待制・家族カード無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "PP無料", "コンシェルジュ", "グルメ優待", "ゴルフ優待", "ディズニー特典"], baseRate:0.5, bonusRates:{'travel':1,'restaurant':2}},
+  'イオンカード': {fee:0, billingType:'fixed', familyFee:0, etcFee:0, note:'永年無料', perks:["ショッピング保険", "イオン優待"], baseRate:0.5, bonusRates:{'supermarket':2}},
+  'イオンゴールドカード': {fee:0, billingType:'fixed', familyFee:0, etcFee:0, note:'招待制・永年無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "イオン優待"], baseRate:0.5, bonusRates:{'supermarket':2}},
+  'イオンカード(WAON一体型)': {fee:0, billingType:'fixed', familyFee:0, etcFee:0, note:'永年無料', perks:["ショッピング保険", "イオン優待", "WAONポイント"], baseRate:0.5, bonusRates:{'supermarket':2}},
+  'イオンカード Suica': {fee:0, billingType:'fixed', familyFee:0, etcFee:0, note:'永年無料', perks:["ショッピング保険", "イオン優待", "Suicaチャージ"], baseRate:0.5, bonusRates:{'supermarket':2,'transport':1.5}},
+  'dカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険", "ショッピング保険", "ケータイ補償"], baseRate:1.0, bonusRates:{'convenience':1}},
+  'dカード GOLD': {fee:11000, billingType:'anniversary', familyFee:1100, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "ケータイ補償"], baseRate:1.0, bonusRates:{'mobile':10,'convenience':1}},
+  'dカード PLATINUM': {fee:33000, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "PP無料", "ケータイ補償", "コンシェルジュ"], baseRate:1.0, bonusRates:{'mobile':10}},
+  'エポスカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険"], baseRate:0.5, bonusRates:{}},
+  'エポスゴールドカード': {fee:5000, billingType:'anniversary', familyFee:0, etcFee:0, note:'招待制で永年無料', perks:["海外旅行保険", "国内空港ラウンジ"], baseRate:0.5, bonusRates:{}},
+  'エポスプラチナカード': {fee:30000, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "国内空港ラウンジ", "PP無料", "コンシェルジュ", "グルメ優待"], baseRate:0.5, bonusRates:{}},
   'マリオットボンヴォイアメックス': {fee:23100, billingType:'anniversary', familyFee:13200, etcFee:0, note:null, perks:["海外旅行保険", "ショッピング保険", "マリオット上位会員", "マイル移行可"]},
   'マリオットボンヴォイアメックスプレミアム': {fee:49500, billingType:'anniversary', familyFee:24750, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "マリオット上位会員", "マイル移行可", "無料宿泊特典"]},
   'ヒルトン・オナーズ アメックス': {fee:16500, billingType:'anniversary', familyFee:6600, etcFee:0, note:null, perks:["海外旅行保険", "ショッピング保険", "ヒルトン上位会員", "マイル移行可"]},
   'ヒルトン・オナーズ アメックス プレミアム': {fee:66000, billingType:'anniversary', familyFee:33000, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "ヒルトンダイヤモンド", "マイル移行可", "PP無料", "無料宿泊特典"]},
   'セゾンカード インターナショナル': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険"]},
-  'セゾンパールアメックス': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'デジタル版は永年無料', perks:["海外旅行保険", "ショッピング保険"]},
+  'セゾンパールアメックス': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'デジタル版は永年無料', perks:["海外旅行保険", "ショッピング保険"], baseRate:0.5, bonusRates:{'restaurant':2}},
   'セゾンゴールドアメックス': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'年100万円以上で永年無料', perks:["海外旅行保険", "ショッピング保険", "国内空港ラウンジ"]},
-  'セゾンゴールドプレミアム': {fee:11000, billingType:'anniversary', familyFee:1100, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "グルメ優待"]},
+  'セゾンゴールドプレミアム': {fee:11000, billingType:'anniversary', familyFee:1100, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "グルメ優待"], baseRate:1.0, bonusRates:{'convenience':1}},
   'セゾンプラチナアメックス': {fee:22000, billingType:'anniversary', familyFee:3300, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "PP有料", "コンシェルジュ", "グルメ優待"]},
   'セゾンプラチナビジネスアメックス': {fee:22000, billingType:'anniversary', familyFee:3300, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "PP有料", "コンシェルジュ"]},
-  'ビューカード': {fee:524, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "Suicaチャージ"]},
-  'ビューゴールドプラスカード': {fee:11000, billingType:'anniversary', familyFee:3300, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "Suicaチャージ"]},
+  'ビューカード': {fee:524, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "Suicaチャージ"], baseRate:0.5, bonusRates:{'transport':1.5}},
+  'ビューゴールドプラスカード': {fee:11000, billingType:'anniversary', familyFee:3300, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "Suicaチャージ"], baseRate:0.5, bonusRates:{'transport':1.5}},
   'ルミネカード': {fee:1048, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "ルミネ優待10%OFF", "Suicaチャージ"]},
-  'ビュー・スイカカード': {fee:524, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "Suicaチャージ"]},
-  'PayPayカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["ショッピング保険"]},
-  'PayPayカード ゴールド': {fee:11000, billingType:'anniversary', familyFee:0, etcFee:0, note:'家族カード無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ"]},
-  'au PAYカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険", "ショッピング保険"]},
-  'au PAY ゴールドカード': {fee:11000, billingType:'anniversary', familyFee:2750, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ"]},
+  'ビュー・スイカカード': {fee:524, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "Suicaチャージ"], baseRate:0.5, bonusRates:{'transport':1.5}},
+  'PayPayカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["ショッピング保険"], baseRate:1.0, bonusRates:{'yahoo':1}},
+  'PayPayカード ゴールド': {fee:11000, billingType:'anniversary', familyFee:0, etcFee:0, note:'家族カード無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ"], baseRate:2.0, bonusRates:{'yahoo':2}},
+  'au PAYカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険", "ショッピング保険"], baseRate:1.0, bonusRates:{}},
+  'au PAY ゴールドカード': {fee:11000, billingType:'anniversary', familyFee:2750, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ"], baseRate:1.0, bonusRates:{'mobile':11}},
   'ANAカード（一般）': {fee:2200, billingType:'anniversary', familyFee:1100, etcFee:0, note:null, perks:["海外旅行保険", "ショッピング保険", "マイル積算", "ANA搭乗ボーナス"]},
   'ANAカード（ワイド）': {fee:7975, billingType:'anniversary', familyFee:2475, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "マイル積算", "ANA搭乗ボーナス"]},
   'ANAカード ゴールド': {fee:15400, billingType:'anniversary', familyFee:4400, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "マイル積算", "ANA搭乗ボーナス"]},
@@ -1222,12 +1326,12 @@ const CARD_PRESETS = {
   'JALカード OPクレジット': {fee:2200, billingType:'anniversary', familyFee:1100, etcFee:0, note:null, perks:["海外旅行保険", "ショッピング保険", "マイル積算", "JAL搭乗ボーナス"]},
   'JALカード TOKYU POINT ClubQ': {fee:2200, billingType:'anniversary', familyFee:1100, etcFee:0, note:null, perks:["海外旅行保険", "ショッピング保険", "マイル積算", "JAL搭乗ボーナス", "TOKYUポイント"]},
   'JAL CLUB EST': {fee:16500, billingType:'anniversary', familyFee:8800, etcFee:0, note:'20〜29歳限定', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "マイル積算", "JAL搭乗ボーナス"]},
-  'JMBローソンPontaカード Visa': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["マイル積算", "Pontaポイント"]},
+  'JMBローソンPontaカード Visa': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["マイル積算", "Pontaポイント"], baseRate:0.5, bonusRates:{'convenience':2}},
   '三菱UFJカード': {fee:1375, billingType:'anniversary', familyFee:440, etcFee:0, note:null, perks:["海外旅行保険", "ショッピング保険"]},
   '三菱UFJカード ゴールドプレステージ': {fee:11000, billingType:'anniversary', familyFee:2750, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ"]},
   '三菱UFJカード プラチナ アメックス': {fee:22000, billingType:'anniversary', familyFee:3300, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "PP無料", "コンシェルジュ", "グルメ優待"]},
   '三菱UFJカード VIASOカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険", "ショッピング保険"]},
-  'リクルートカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険", "ショッピング保険"]},
+  'リクルートカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険", "ショッピング保険"], baseRate:1.2, bonusRates:{}},
   'ライフカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険"]},
   'ライフカード ゴールド': {fee:11000, billingType:'anniversary', familyFee:2750, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ"]},
   'Orico Card THE POINT': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ショッピング保険"]},
@@ -1237,15 +1341,15 @@ const CARD_PRESETS = {
   'TRUST CLUB プラチナマスターカード': {fee:3300, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "ショッピング保険"]},
   'TRUST CLUB ワールドカード': {fee:13200, billingType:'anniversary', familyFee:4400, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "グルメ優待"]},
   'TRUST CLUB ワールドエリートカード': {fee:143000, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "PP無料", "コンシェルジュ", "グルメ優待", "ゴルフ優待"]},
-  'セブンカード・プラス': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ショッピング保険", "セブン優待"]},
-  'ファミマTカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ファミマ優待"]},
-  'ローソンPontaプラス': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["Pontaポイント高還元", "ローソン優待"]},
-  'メルカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["メルカリポイント還元"]},
+  'セブンカード・プラス': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ショッピング保険", "セブン優待"], baseRate:0.5, bonusRates:{'convenience':1.5}},
+  'ファミマTカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ファミマ優待"], baseRate:0.5, bonusRates:{'convenience':1.5}},
+  'ローソンPontaプラス': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["Pontaポイント高還元", "ローソン優待"], baseRate:1.0, bonusRates:{'convenience':4}},
+  'メルカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["メルカリポイント還元"], baseRate:1.0, bonusRates:{}},
   'メルカードゴールド': {fee:11000, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "メルカリポイント還元"]},
-  'Amazon Mastercard クラシック': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ショッピング保険", "Amazon優待"]},
-  'Amazon Mastercard ゴールド': {fee:11000, billingType:'anniversary', familyFee:2750, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "Amazon優待"]},
-  'ビックカメラSuicaカード': {fee:524, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "ビックカメラ優待", "Suicaチャージ"]},
-  'ゴールドポイントカード・プラス': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ヨドバシ優待"]},
+  'Amazon Mastercard クラシック': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ショッピング保険", "Amazon優待"], baseRate:1.0, bonusRates:{'amazon':2}},
+  'Amazon Mastercard ゴールド': {fee:11000, billingType:'anniversary', familyFee:2750, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "Amazon優待"], baseRate:1.5, bonusRates:{'amazon':2.5}},
+  'ビックカメラSuicaカード': {fee:524, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "ビックカメラ優待", "Suicaチャージ"], baseRate:0.5, bonusRates:{'transport':1.5}},
+  'ゴールドポイントカード・プラス': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ヨドバシ優待"], baseRate:1.0, bonusRates:{}},
   '高島屋カード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'年1回以上利用で無料', perks:["高島屋優待", "ショッピング優待"]},
   '高島屋ゴールドカード': {fee:11000, billingType:'anniversary', familyFee:2750, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "高島屋優待", "ショッピング優待", "国内空港ラウンジ"]},
   'MIカード': {fee:2200, billingType:'anniversary', familyFee:1100, etcFee:0, note:null, perks:["伊勢丹・三越優待", "ショッピング優待"]},
@@ -1253,15 +1357,15 @@ const CARD_PRESETS = {
   'JFRカード': {fee:2200, billingType:'anniversary', familyFee:1100, etcFee:0, note:null, perks:["大丸・松坂屋優待", "ショッピング優待"]},
   'JFRカード ゴールド': {fee:11000, billingType:'anniversary', familyFee:2750, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "大丸・松坂屋優待", "ショッピング優待", "国内空港ラウンジ"]},
   'コストコグローバルカード': {fee:1375, billingType:'anniversary', familyFee:440, etcFee:0, note:null, perks:["海外旅行保険", "ショッピング保険", "コストコ還元"]},
-  '出光カード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'初年度無料・年1回利用で翌年無料', perks:["ガソリン優待", "出光SS割引"]},
-  '出光カード ゴールド': {fee:11000, billingType:'anniversary', familyFee:2750, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ガソリン優待", "出光SS割引", "国内空港ラウンジ"]},
-  'ENEOSカード S': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ガソリン優待", "ENEOS割引"]},
-  'ENEOSカード P': {fee:1375, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["ガソリン優待", "ENEOS割引", "ポイント高還元"]},
-  'ENEOSカード C': {fee:1375, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["ガソリン優待", "ENEOS割引", "キャッシュバック"]},
-  'コスモ・ザ・カード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ガソリン優待", "コスモSS割引"]},
-  'apollostation card': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ガソリン優待", "出光・昭シェルSS割引"]},
-  'TOKYU CARD ClubQ JMB': {fee:524, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "TOKYUポイント", "JALマイル積算"]},
-  'TOKYU CARD ClubQ JMB ゴールド': {fee:6600, billingType:'anniversary', familyFee:1650, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "国内空港ラウンジ", "TOKYUポイント", "JALマイル積算"]},
+  '出光カード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'初年度無料・年1回利用で翌年無料', perks:["ガソリン優待", "出光SS割引"], baseRate:0.5, bonusRates:{'gas':1.0}},
+  '出光カード ゴールド': {fee:11000, billingType:'anniversary', familyFee:2750, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ガソリン優待", "出光SS割引", "国内空港ラウンジ"], baseRate:0.5, bonusRates:{'gas':1.0}},
+  'ENEOSカード S': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ガソリン優待", "ENEOS割引"], baseRate:0.6, bonusRates:{'gas':1.5}},
+  'ENEOSカード P': {fee:1375, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["ガソリン優待", "ENEOS割引", "ポイント高還元"], baseRate:0.6, bonusRates:{'gas':1.5}},
+  'ENEOSカード C': {fee:1375, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["ガソリン優待", "ENEOS割引", "キャッシュバック"], baseRate:0.6, bonusRates:{'gas':1.5}},
+  'コスモ・ザ・カード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ガソリン優待", "コスモSS割引"], baseRate:0.5, bonusRates:{'gas':1.0}},
+  'apollostation card': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ガソリン優待", "出光・昭シェルSS割引"], baseRate:1.0, bonusRates:{'gas':1.5}},
+  'TOKYU CARD ClubQ JMB': {fee:524, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "TOKYUポイント", "JALマイル積算"], baseRate:0.5, bonusRates:{'transport':1.0}},
+  'TOKYU CARD ClubQ JMB ゴールド': {fee:6600, billingType:'anniversary', familyFee:1650, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "国内空港ラウンジ", "TOKYUポイント", "JALマイル積算"], baseRate:0.5, bonusRates:{'transport':1.0}},
   '小田急OPクレジット': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'年1回以上利用で無料', perks:["海外旅行保険", "小田急沿線優待"]},
   '小田急OPクレジット ゴールド': {fee:11000, billingType:'anniversary', familyFee:2750, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "国内空港ラウンジ", "小田急沿線優待"]},
   '西武プリンスカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'年1回以上利用で無料', perks:["海外旅行保険", "プリンスホテル優待"]},
@@ -1288,12 +1392,12 @@ const CARD_PRESETS = {
   'セゾンコバルトビジネスアメックス': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ショッピング保険"]},
   'MUFGビジネスカード': {fee:1375, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "ショッピング保険"]},
   '楽天ビジネスカード': {fee:2200, billingType:'anniversary', familyFee:0, etcFee:0, note:'楽天プレミアム会員限定', perks:["海外旅行保険", "ショッピング保険"]},
-  '三井住友カード（旧 SBI証券）': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険"]},
+  '三井住友カード（旧 SBI証券）': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険"], baseRate:0.5, bonusRates:{'convenience':5}},
   'IHGホテルズ リワーズ Visaカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["IHGポイント", "マイル移行可"]},
   'IHGホテルズ リワーズ Visaプレミアムカード': {fee:13200, billingType:'anniversary', familyFee:6600, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "IHGプラチナエリート", "マイル移行可", "無料宿泊特典", "国内空港ラウンジ"]},
   'ハイアットカード': {fee:16500, billingType:'anniversary', familyFee:0, etcFee:0, note:null, perks:["海外旅行保険", "ショッピング保険", "ハイアット上位会員", "マイル移行可"]},
   'Nexus Card': {fee:1375, billingType:'anniversary', familyFee:440, etcFee:0, note:null, perks:["海外旅行保険"]},
-  'P-Oneカード<Standard>': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["請求時1%割引"]},
+  'P-Oneカード<Standard>': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["請求時1%割引"], baseRate:1.0, bonusRates:{}},
   'TS CUBIC CARD': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["ガソリン優待", "トヨタ系優待"]},
   'TS CUBIC CARD GOLD': {fee:6600, billingType:'anniversary', familyFee:3300, etcFee:0, note:null, perks:["海外旅行保険", "国内旅行保険", "ガソリン優待", "トヨタ系優待", "国内空港ラウンジ"]},
   'レクサスカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料・レクサスオーナー限定', perks:["ガソリン優待", "レクサス特典サービス"]},
@@ -1305,7 +1409,7 @@ const CARD_PRESETS = {
   'ラグジュアリーカード ゴールド': {fee:220000, billingType:'anniversary', familyFee:55000, etcFee:0, note:'金属製カード・国内最高峰', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "PP無料", "国内空港ラウンジ", "コンシェルジュ", "グルメ優待", "ゴルフ優待", "ホテル上位会員"]},
   'Amex ゴールド・プリファード': {fee:39600, billingType:'anniversary', familyFee:19800, etcFee:0, note:'2023年刷新', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ", "グルメ優待", "コンシェルジュ"]},
   'Orico Card THE PLATINUM': {fee:20370, billingType:'anniversary', familyFee:0, etcFee:0, note:'家族カード2枚無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "PP無料", "国内空港ラウンジ", "コンシェルジュ", "グルメ優待"]},
-  'Tカード Prime': {fee:1375, billingType:'anniversary', familyFee:0, etcFee:0, note:'SBユーザー永年無料', perks:["海外旅行保険", "ショッピング保険"]},
+  'Tカード Prime': {fee:1375, billingType:'anniversary', familyFee:0, etcFee:0, note:'SBユーザー永年無料', perks:["海外旅行保険", "ショッピング保険"], baseRate:1.0, bonusRates:{}},
   'JQ CARD エポス': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険"]},
   'JQ CARD エポス ゴールド': {fee:5000, billingType:'anniversary', familyFee:0, etcFee:0, note:'招待で永年無料', perks:["海外旅行保険", "国内旅行保険", "ショッピング保険", "国内空港ラウンジ"]},
   'みずほマイレージクラブカード': {fee:0, billingType:'anniversary', familyFee:0, etcFee:0, note:'永年無料', perks:["海外旅行保険", "マイル積算"]},
